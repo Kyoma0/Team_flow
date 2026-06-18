@@ -1,0 +1,15 @@
+console.log('');
+console.log('  ╔══════════════════════════════════════════╗');
+console.log('  ║           TeamFlow                        ║');
+console.log('  ╠══════════════════════════════════════════╣');
+console.log('  ║                                          ║');
+console.log('  ║  📱 Frontend: http://localhost:3000      ║');
+console.log('  ║  🖥️  Backend:  http://localhost:4000/api  ║');
+console.log('  ║                                          ║');
+console.log('  ║  Usuários de teste:                      ║');
+console.log('  ║  admin@teamflow.com / admin123           ║');
+console.log('  ║  lider@teamflow.com  / leader123         ║');
+console.log('  ║  funcionario@teamflow.com / func123      ║');
+console.log('  ║                                          ║');
+console.log('  ╚══════════════════════════════════════════╝');
+console.log('');

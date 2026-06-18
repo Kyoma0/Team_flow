@@ -1,0 +1,705 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String   @id @default(uuid())
+  username             String   @unique
+  name                 String
+  email                String   @unique
+  password             String
+  avatar               String?
+  roleType             String   @default("EMPLOYEE")
+  roleId               String?
+  role                 Role?    @relation(fields: [roleId], references: [id])
+  isActive             Boolean  @default(true)
+  emailVerified        Boolean  @default(false)
+  emailToken           String?
+  verificationToken    String?
+  planId               String?
+  plan                 Plan?    @relation(fields: [planId], references: [id])
+  twoFactorSecret      String?
+  twoFactorEnabled     Boolean  @default(false)
+  backupCodes          String?
+  notifyTaskAssigned   Boolean  @default(true)
+  notifyTaskStatus     Boolean  @default(true)
+  notifyDeliveryStatus Boolean  @default(true)
+  notifyMentioned      Boolean  @default(true)
+  notifyCommentReply   Boolean  @default(true)
+  pushSubscription     String?
+  storageUsed          BigInt   @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  ownedProjects      Project[]           @relation("ProjectOwner")
+  assignedTasks      Task[]              @relation("TaskAssignee")
+  createdTasks       Task[]              @relation("TaskCreator")
+  memberships        ProjectMember[]
+  comments           TaskComment[]
+  taskHistories      TaskHistory[]
+  uploadedFiles      File[]
+  fileVersions       FileVersion[]
+  deliveries         Delivery[]          @relation("DeliveryCreator")
+  reviewedDeliveries Delivery[]          @relation("DeliveryReviewer")
+  groupMemberships   GroupMember[]
+  messages           Message[]
+  notifications      Notification[]      @relation("NotificationRecipient")
+  sentNotifications  Notification[]      @relation("NotificationSender")
+  createdGroups      Group[]             @relation("GroupCreator")
+  refreshTokens      RefreshToken[]
+  auditLogs          AuditLog[]
+  folders            Folder[]
+  clients            Client[]
+  deliveryVersions   DeliveryVersion[]
+  timeEntries        TimeEntry[]
+  templates          TaskTemplate[]
+  planHistories      PlanHistory[]
+  webhooks           Webhook[]
+  apiTokens          ApiToken[]
+  invites            Invite[]
+  taskWatchers       TaskWatcher[]
+  inAppNotifications InAppNotification[]
+  planSubscription   Subscription[]
+  favoriteTasks      FavoriteTask[]
+
+  @@map("users")
+}
+
+model Webhook {
+  id          String   @id @default(uuid())
+  url         String
+  events      String   @default("[]")
+  secret      String
+  active      Boolean  @default(true)
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  logs WebhookLog[]
+
+  @@map("webhooks")
+}
+
+model WebhookLog {
+  id        String   @id @default(uuid())
+  webhookId String
+  webhook   Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event     String
+  status    Int
+  response  String?
+  duration  Int
+  createdAt DateTime @default(now())
+
+  @@map("webhook_logs")
+}
+
+model ApiToken {
+  id        String    @id @default(uuid())
+  name      String
+  token     String    @unique
+  lastUsed  DateTime?
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("api_tokens")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model Plan {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  description  String?
+  maxUsers     Int
+  maxStorage   BigInt
+  maxProjects  Int
+  priceMonthly Float    @default(0)
+  priceYearly  Float    @default(0)
+  features     String   @default("[]")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users         User[]
+  planHistories PlanHistory[]
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model PlanHistory {
+  id        String   @id @default(uuid())
+  planId    String
+  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  data      String?
+  createdAt DateTime @default(now())
+
+  @@map("plan_histories")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions String   @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+
+  @@map("roles")
+}
+
+model Client {
+  id          String   @id @default(uuid())
+  name        String
+  company     String?
+  email       String?
+  phone       String?
+  avatar      String?
+  notes       String?
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projects Project[]
+
+  @@map("clients")
+}
+
+model Project {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  clientId    String?
+  client      Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  startDate   DateTime?
+  endDate     DateTime?
+  status      String    @default("PLANNING")
+  ownerId     String
+  owner       User      @relation("ProjectOwner", fields: [ownerId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  members       ProjectMember[]
+  tasks         Task[]
+  files         File[]
+  folders       Folder[]
+  groups        Group[]
+  deliveries    Delivery[]
+  notifications Notification[]
+  webhooks      Webhook[]
+  customFields  CustomField[]
+  invites       Invite[]
+  definedTags   Tag[]
+  boards        Board[]
+
+  @@map("projects")
+}
+
+model ProjectMember {
+  id         String   @id @default(uuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       String   @default("member")
+  isFavorite Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+model Folder {
+  id          String   @id @default(uuid())
+  name        String
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      Folder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Folder[] @relation("FolderTree")
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  files File[]
+
+  @@unique([projectId, name, parentId])
+  @@map("folders")
+}
+
+model Task {
+  id            String       @id @default(uuid())
+  title         String
+  description   String?
+  status        String       @default("NOT_STARTED")
+  priority      String       @default("MEDIUM")
+  dueDate       DateTime?
+  position      Float        @default(0)
+  recurring     String?
+  repeatUntil   DateTime?
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignedToId  String?
+  assignedTo    User?        @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdById   String
+  createdBy     User         @relation("TaskCreator", fields: [createdById], references: [id])
+  boardColumnId String?
+  boardColumn   BoardColumn? @relation(fields: [boardColumnId], references: [id], onDelete: SetNull)
+  deletedAt     DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  comments          TaskComment[]
+  histories         TaskHistory[]
+  files             File[]
+  timeEntries       TimeEntry[]
+  dependencies      TaskDependency[]    @relation("TaskDependsOn")
+  dependents        TaskDependency[]    @relation("TaskDependents")
+  customFieldValues CustomFieldValue[]
+  watchers          TaskWatcher[]
+  checklistItems    TaskChecklistItem[]
+  tags              TaskTag[]
+  favoritedBy       FavoriteTask[]
+
+  @@index([boardColumnId])
+  @@map("tasks")
+}
+
+model TaskComment {
+  id        String        @id @default(uuid())
+  content   String
+  taskId    String
+  task      Task          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
+  parentId  String?
+  parent    TaskComment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   TaskComment[] @relation("CommentReplies")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@map("task_comments")
+}
+
+model TaskHistory {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  field     String
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime @default(now())
+
+  @@map("task_histories")
+}
+
+model TaskDependency {
+  id          String   @id @default(uuid())
+  taskId      String
+  task        Task     @relation("TaskDependents", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOnId String
+  dependsOn   Task     @relation("TaskDependsOn", fields: [dependsOnId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([taskId, dependsOnId])
+  @@map("task_dependencies")
+}
+
+model TimeEntry {
+  id          String    @id @default(uuid())
+  taskId      String
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  duration    Int       @default(0)
+  description String?
+  startedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@map("time_entries")
+}
+
+model TaskTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  color       String   @default("#3b82f6")
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items TaskTemplateItem[]
+
+  @@map("task_templates")
+}
+
+model TaskTemplateItem {
+  id          String       @id @default(uuid())
+  templateId  String
+  template    TaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  priority    String       @default("MEDIUM")
+  order       Int          @default(0)
+  createdAt   DateTime     @default(now())
+
+  @@map("task_template_items")
+}
+
+model Delivery {
+  id           String    @id @default(uuid())
+  title        String
+  description  String?
+  status       String    @default("IN_PRODUCTION")
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById  String
+  createdBy    User      @relation("DeliveryCreator", fields: [createdById], references: [id])
+  reviewedById String?
+  reviewedBy   User?     @relation("DeliveryReviewer", fields: [reviewedById], references: [id])
+  reviewNote   String?
+  reviewedAt   DateTime?
+  dueDate      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  files    File[]
+  versions DeliveryVersion[]
+
+  @@map("deliveries")
+}
+
+model DeliveryVersion {
+  id           String   @id @default(uuid())
+  version      Int
+  note         String?
+  deliveryId   String
+  delivery     Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  files        String   @default("[]")
+  createdAt    DateTime @default(now())
+
+  @@map("delivery_versions")
+}
+
+model File {
+  id           String    @id @default(uuid())
+  name         String
+  originalName String
+  mimeType     String
+  size         Int
+  key          String
+  version      Int       @default(1)
+  folderId     String?
+  folder       Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId       String?
+  task         Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  groupId      String?
+  group        Group?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  deliveryId   String?
+  delivery     Delivery? @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+  uploadedById String
+  uploadedBy   User      @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime  @default(now())
+
+  versions FileVersion[]
+  messages Message[]
+
+  @@map("files")
+}
+
+model FileVersion {
+  id           String   @id @default(uuid())
+  version      Int
+  name         String
+  originalName String
+  size         Int
+  key          String
+  note         String?
+  fileId       String
+  file         File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@map("file_versions")
+}
+
+model Group {
+  id          String   @id @default(uuid())
+  name        String
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User     @relation("GroupCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members  GroupMember[]
+  messages Message[]
+  files    File[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([groupId, userId])
+  @@map("group_members")
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  content   String?
+  groupId   String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  fileId    String?
+  file      File?    @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@map("messages")
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  type        String
+  content     String
+  recipientId String
+  recipient   User     @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  senderId    String?
+  sender      User?    @relation("NotificationSender", fields: [senderId], references: [id], onDelete: SetNull)
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId      String?
+  deliveryId  String?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model Invite {
+  id          String    @id @default(uuid())
+  email       String
+  token       String    @unique
+  role        String    @default("MEMBER")
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  invitedById String
+  invitedBy   User      @relation(fields: [invitedById], references: [id])
+  acceptedAt  DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  @@map("invites")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  entity    String
+  entityId  String?
+  metadata  String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model CustomField {
+  id        String             @id @default(uuid())
+  name      String
+  type      String             @default("text")
+  required  Boolean            @default(false)
+  options   String?
+  projectId String
+  project   Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  values    CustomFieldValue[]
+
+  @@map("custom_fields")
+}
+
+model CustomFieldValue {
+  id            String      @id @default(uuid())
+  value         String?
+  customFieldId String
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  taskId        String
+  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([customFieldId, taskId])
+  @@map("custom_field_values")
+}
+
+model TaskWatcher {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@map("task_watchers")
+}
+
+model TaskChecklistItem {
+  id        String   @id @default(uuid())
+  content   String
+  checked   Boolean  @default(false)
+  order     Int      @default(0)
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("task_checklist_items")
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String
+  color     String   @default("#3b82f6")
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  tasks TaskTag[]
+
+  @@unique([name, projectId])
+  @@map("tags")
+}
+
+model TaskTag {
+  id     String @id @default(uuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, tagId])
+  @@map("task_tags")
+}
+
+model FavoriteTask {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, taskId])
+  @@map("favorite_tasks")
+}
+
+model InAppNotification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String?
+  type      String   @default("info")
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@map("in_app_notifications")
+}
+
+model Subscription {
+  id                 String    @id @default(uuid())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               Plan      @relation(fields: [planId], references: [id])
+  status             String    @default("ACTIVE")
+  provider           String    @default("asaas")
+  providerId         String?   @unique
+  customerId         String?
+  billingCycle       String    @default("monthly")
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelledAt        DateTime?
+  trialEndsAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([userId, planId])
+  @@map("subscriptions")
+}
+
+model Board {
+  id        String        @id @default(uuid())
+  name      String
+  projectId String
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  isDefault Boolean       @default(false)
+  order     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  columns   BoardColumn[]
+
+  @@unique([projectId, name])
+  @@map("boards")
+}
+
+model BoardColumn {
+  id      String @id @default(uuid())
+  name    String
+  color   String @default("#6b7280")
+  status  String
+  order   Int    @default(0)
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@unique([boardId, status])
+  @@map("board_columns")
+}
