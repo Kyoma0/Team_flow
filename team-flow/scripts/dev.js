@@ -1,66 +1,129 @@
 const { spawn, execSync } = require('child_process');
+const path = require('path');
 
-// Kill old processes
-[3000, 3001, 4000].forEach((port) => {
-  try {
-    execSync(`netstat -ano | findstr :${port}`, { shell: true, stdio: 'pipe' })
-      .toString().split('\n').forEach((line) => {
-        const parts = line.trim().split(/\s+/);
-        if (parts[4]) try { execSync(`taskkill /F /PID ${parts[4]} 2>nul`, { stdio: 'ignore' }); } catch {}
-      });
-  } catch {}
-});
+// Kill processes on dev ports 3000 and 3001
+try {
+  execSync(`powershell -Command "Get-NetTCPConnection -LocalPort 3000,3001 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"`, { stdio: 'ignore' });
+} catch {}
+
+// Clean stale caches
+const fs = require('fs');
+
+const nextDir = path.join(__dirname, '..', 'frontend', '.next');
+try {
+  if (fs.existsSync(nextDir)) {
+    fs.rmSync(nextDir, { recursive: true, force: true });
+    console.log('[clean] Cache .next limpo');
+  }
+} catch (e) {
+  console.warn('[clean] Não foi possível limpar .next:', e.message);
+}
+
+const distDir = path.join(__dirname, '..', 'backend', 'dist');
+try {
+  if (fs.existsSync(distDir)) {
+    fs.rmSync(distDir, { recursive: true, force: true });
+    console.log('[clean] Build backend limpo');
+  }
+} catch (e) {
+  console.warn('[clean] Não foi possível limpar dist:', e.message);
+}
 
 const prefix = (name) => (text) => {
   text.toString().split('\n').forEach((line) => {
-    if (line.trim()) process.stdout.write(`[${name}] ${line}\n`);
+    const trimmed = line.trim();
+    if (trimmed) process.stdout.write(`[${name}] ${trimmed}\n`);
   });
 };
 
-const backend = spawn('npm.cmd', ['run', 'dev'], { cwd: 'backend', shell: true });
-const frontend = spawn('npm.cmd', ['run', 'dev'], { cwd: 'frontend', shell: true });
+console.log('[dev] Iniciando backend...');
+const backend = spawn('npm.cmd', ['run', 'dev'], { cwd: path.join(__dirname, '..', 'backend'), shell: true });
 
-let backendPort = '';
-let frontendPort = '';
+console.log('[dev] Iniciando frontend...');
+const frontend = spawn('npm.cmd', ['run', 'dev'], { cwd: path.join(__dirname, '..', 'frontend'), shell: true });
+
 let backendReady = false;
 let frontendReady = false;
+let shown = false;
 
 backend.stdout.on('data', (data) => {
   const text = data.toString();
   prefix('backend')(text);
-  if (text.includes('rodando em http')) {
-    const m = text.match(/rodando em http:\/\/localhost:(\d+)/);
-    if (m) backendPort = m[1];
-  }
-  if (text.includes('Nest application successfully started')) {
-    backendReady = true; checkReady();
+  if (!backendReady && text.includes('Nest application successfully started')) {
+    backendReady = true;
+    checkReady();
   }
 });
 
 backend.stderr.on('data', (data) => prefix('backend')(data));
+backend.on('exit', (code) => {
+  console.error(`[dev] Backend encerrou (código ${code})`);
+  if (!backendReady) process.exit(1);
+});
+
+const http = require('http');
+
+function waitForFrontend(retries = 60) {
+  return new Promise((resolve) => {
+    function check() {
+      const req = http.get('http://localhost:3000', (res) => {
+        let body = '';
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => {
+          // Confirma que HTML foi compilado (não é texto vazio nem erro cru)
+          if (res.statusCode === 200 && body.includes('<html')) {
+            resolve();
+          } else if (retries > 0) {
+            retries--;
+            setTimeout(check, 1000);
+          } else {
+            resolve(); // desiste mas não quebra
+          }
+        });
+      });
+      req.on('error', () => {
+        if (retries > 0) {
+          retries--;
+          setTimeout(check, 1000);
+        } else {
+          resolve();
+        }
+      });
+      req.end();
+    }
+    check();
+  });
+}
 
 frontend.stdout.on('data', (data) => {
   const text = data.toString();
   prefix('frontend')(text);
-  const m = text.match(/Local:\s+http:\/\/localhost:(\d+)/);
-  if (m) frontendPort = m[1];
-  if (text.includes('Ready in')) { frontendReady = true; checkReady(); }
+  if (!frontendReady && (text.includes('Ready in') || text.includes('ready in'))) {
+    // Só marca como pronto após confirmar que o HTML compilou
+    waitForFrontend().then(() => {
+      frontendReady = true;
+      checkReady();
+    });
+  }
 });
 
 frontend.stderr.on('data', (data) => prefix('frontend')(data));
+frontend.on('exit', (code) => {
+  console.error(`[dev] Frontend encerrou (código ${code})`);
+  if (!frontendReady) process.exit(1);
+});
 
-let shown = false;
 function checkReady() {
   if (shown) return;
-  if (frontendReady) {
+  if (backendReady && frontendReady) {
     shown = true;
-    setTimeout(showBanner, 600);
+    setTimeout(showBanner, 800);
   }
 }
 
 function showBanner() {
-  const fe = frontendPort || '3000';
-  const be = backendPort || '3001';
+  const be = '3001';
+  const fe = '3000';
   console.log('');
   console.log('  ╔══════════════════════════════════════════════════╗');
   console.log('  ║           TeamFlow - PRONTO!                    ║');
@@ -80,4 +143,9 @@ function showBanner() {
   console.log('');
 }
 
-process.on('SIGINT', () => process.exit());
+process.on('SIGINT', () => {
+  console.log('\n[dev] Encerrando...');
+  backend.kill();
+  frontend.kill();
+  process.exit();
+});

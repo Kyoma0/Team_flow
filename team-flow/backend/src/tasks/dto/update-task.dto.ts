@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsIn, IsDateString, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class UpdateTaskDto {
   @IsOptional()
@@ -22,6 +23,7 @@ export class UpdateTaskDto {
 
   @IsOptional()
   @IsDateString()
+  @Transform(({ value }) => value || undefined)
   dueDate?: string;
 
   @IsOptional()
@@ -42,5 +44,6 @@ export class UpdateTaskDto {
 
   @IsOptional()
   @IsDateString()
+  @Transform(({ value }) => value || undefined)
   repeatUntil?: string;
 }

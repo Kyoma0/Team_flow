@@ -47,61 +47,92 @@ export class AuthService {
     password: string;
     username?: string;
     roleType?: string;
+    companyName?: string;
+    companyId?: string;
   }) {
-    const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
-    if (existing) throw new ConflictException('Email já cadastrado');
+    try {
+      const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
+      if (existing) throw new ConflictException('Email já cadastrado');
 
-    const username = data.username || data.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      const username = data.username || data.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_');
 
-    const existingUsername = await this.prisma.user.findUnique({ where: { username } });
-    if (existingUsername) throw new ConflictException('Username já está em uso');
+      const existingUsername = await this.prisma.user.findUnique({ where: { username } });
+      if (existingUsername) throw new ConflictException('Username já está em uso');
 
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+      const hashedPassword = await bcrypt.hash(data.password, 10);
 
-    const freePlan = await this.prisma.plan.findFirst({
-      where: { priceMonthly: 0, isActive: true },
-      orderBy: { priceMonthly: 'asc' },
-    });
+      const freePlan = await this.prisma.plan.findFirst({
+        where: { priceMonthly: 0, isActive: true },
+        orderBy: { priceMonthly: 'asc' },
+      });
 
-    const user = await this.prisma.user.create({
-      data: {
-        username,
-        name: data.name,
-        email: data.email,
-        password: hashedPassword,
-        roleType: (data.roleType as any) || 'EMPLOYEE',
-        planId: freePlan?.id || null,
-      },
-      select: { id: true, username: true, name: true, email: true, roleType: true, avatar: true, createdAt: true, planId: true },
-    });
+      const user = await this.prisma.user.create({
+        data: {
+          username,
+          name: data.name,
+          email: data.email,
+          password: hashedPassword,
+          roleType: (data.roleType as any) || 'EMPLOYEE',
+          planId: freePlan?.id || null,
+        },
+        select: { id: true, username: true, name: true, email: true, roleType: true, avatar: true, createdAt: true, planId: true },
+      });
 
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { verificationToken },
-    });
+      if (data.companyId) {
+        const company = await this.prisma.company.findUnique({ where: { id: data.companyId } });
+        if (!company) throw new BadRequestException('Empresa não encontrada');
+        await this.prisma.companyMember.create({
+          data: { companyId: data.companyId, userId: user.id, role: 'MEMBER' },
+        });
+      } else if (data.companyName) {
+        const slug = data.companyName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        await this.prisma.company.create({
+          data: {
+            name: data.companyName,
+            slug,
+            members: {
+              create: { userId: user.id, role: 'OWNER' },
+            },
+          },
+        });
+      }
 
-    const verifyUrl = `${process.env.CORS_ORIGIN || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
-    await this.emailService.sendWelcome(user.email, user.name);
-    await this.emailService.sendEmailConfirmation(user.email, verificationToken);
-    await this.emailService.sendEmail(
-      user.email,
-      'Confirme seu email - TeamFlow',
-      `Olá ${user.name}! Confirme seu email clicando no link: ${verifyUrl}`,
-    );
+      try {
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { verificationToken },
+        });
 
-    const tokens = await this.generateTokens(user);
+        const verifyUrl = `${process.env.CORS_ORIGIN || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+        await this.emailService.sendWelcome(user.email, user.name);
+        await this.emailService.sendEmailConfirmation(user.email, verificationToken);
+        await this.emailService.sendEmail(
+          user.email,
+          'Confirme seu email - TeamFlow',
+          `Olá ${user.name}! Confirme seu email clicando no link: ${verifyUrl}`,
+        );
+      } catch (emailErr) {
+        console.warn('[Auth] Falha ao enviar email de boas-vindas:', emailErr);
+      }
 
-    return { user, ...tokens };
+      const tokens = await this.generateTokens(user);
+
+      return { user, ...tokens };
+    } catch (err) {
+      if (err instanceof ConflictException || err instanceof BadRequestException) throw err;
+      console.error('[Auth] Erro no registro:', err);
+      throw err;
+    }
   }
 
   async confirmEmail(token: string) {
-    const user = await this.prisma.user.findFirst({ where: { emailToken: token } });
+    const user = await this.prisma.user.findFirst({ where: { verificationToken: token } });
     if (!user) throw new BadRequestException('Token inválido');
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { emailVerified: true, emailToken: null },
+      data: { emailVerified: true, verificationToken: null },
     });
 
     return { message: 'Email confirmado com sucesso' };
@@ -117,8 +148,8 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user);
 
-    const { password: _, ...userWithoutPassword } = user;
-    return { user: userWithoutPassword, ...tokens };
+    const { password: _, storageUsed: __, ...userWithoutPassword } = user;
+    return { user: { ...userWithoutPassword, storageUsed: Number(user.storageUsed) }, ...tokens };
   }
 
   async refresh(refreshToken: string) {

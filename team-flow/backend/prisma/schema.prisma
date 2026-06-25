@@ -66,6 +66,7 @@ model User {
   inAppNotifications InAppNotification[]
   planSubscription   Subscription[]
   favoriteTasks      FavoriteTask[]
+  companies         CompanyMember[]
 
   @@map("users")
 }
@@ -132,6 +133,7 @@ model Plan {
   maxUsers     Int
   maxStorage   BigInt
   maxProjects  Int
+  maxTasks     Int      @default(999999)
   priceMonthly Float    @default(0)
   priceYearly  Float    @default(0)
   features     String   @default("[]")
@@ -190,12 +192,41 @@ model Client {
   @@map("clients")
 }
 
+model Company {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  logo      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members CompanyMember[]
+  projects Project[]
+
+  @@map("companies")
+}
+
+model CompanyMember {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("MEMBER")
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, userId])
+  @@map("company_members")
+}
+
 model Project {
   id          String    @id @default(uuid())
   name        String
   description String?
   clientId    String?
   client      Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  companyId   String?
+  company     Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
   startDate   DateTime?
   endDate     DateTime?
   status      String    @default("PLANNING")

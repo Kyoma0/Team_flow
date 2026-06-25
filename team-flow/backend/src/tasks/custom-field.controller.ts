@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { CustomFieldService } from './custom-field.service';
 import { AuthGuard } from '../common/guards/auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller()
 @UseGuards(AuthGuard)
@@ -13,8 +14,8 @@ export class CustomFieldController {
   }
 
   @Post('projects/:projectId/custom-fields')
-  create(@Param('projectId') projectId: string, @Body() body: { name: string; type: string; required?: boolean; options?: string[] }) {
-    return this.customFieldService.create({ ...body, projectId });
+  create(@Param('projectId') projectId: string, @Body() body: { name: string; type: string; required?: boolean; options?: string[] }, @CurrentUser() user: any) {
+    return this.customFieldService.create({ ...body, projectId, userId: user.sub });
   }
 
   @Patch('custom-fields/:id')

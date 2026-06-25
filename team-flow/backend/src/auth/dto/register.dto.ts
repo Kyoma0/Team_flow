@@ -19,4 +19,12 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   roleType?: string;
+
+  @IsOptional()
+  @IsString()
+  companyName?: string;
+
+  @IsOptional()
+  @IsString()
+  companyId?: string;
 }

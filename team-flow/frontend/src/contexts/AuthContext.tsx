@@ -10,7 +10,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<any>;
   completeTwoFactorLogin: (email: string, token: string) => Promise<void>;
-  register: (name: string, email: string, password: string, username?: string, roleType?: string) => Promise<void>;
+  register: (name: string, email: string, password: string, username?: string, roleType?: string, companyName?: string, companyId?: string) => Promise<void>;
   logout: () => void;
   updateUser: (data: Partial<User>) => void;
   refreshUser?: () => Promise<void>;
@@ -56,8 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     storeSession(data);
   };
 
-  const register = async (name: string, email: string, password: string, username?: string, roleType?: string) => {
-    const { data } = await api.post('/api/auth/register', { name, email, password, username, roleType });
+  const register = async (name: string, email: string, password: string, username?: string, roleType?: string, companyName?: string, companyId?: string) => {
+    const { data } = await api.post('/api/auth/register', { name, email, password, username, roleType, companyName, companyId });
     storeSession(data);
   };
 

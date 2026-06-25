@@ -46,7 +46,8 @@ export default function ProjectsPage() {
     e.preventDefault();
     setCreating(true);
     try {
-      await api.post('/api/projects', formData);
+      const payload = { ...formData, startDate: formData.startDate || undefined, endDate: formData.endDate || undefined };
+      await api.post('/api/projects', payload);
       toast.success('Projeto criado!');
       setShowCreateModal(false);
       setFormData({ name: '', description: '', startDate: '', endDate: '', clientId: '' });

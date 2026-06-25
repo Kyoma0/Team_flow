@@ -17,6 +17,9 @@ describe('PlanLimitsService', () => {
     projectMember: {
       count: jest.fn(),
     },
+    task: {
+      count: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -33,6 +36,43 @@ describe('PlanLimitsService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('checkTaskLimit', () => {
+    it('should allow when under limit', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        plan: { maxTasks: 100 },
+      });
+      mockPrisma.task.count.mockResolvedValue(50);
+
+      await expect(
+        service.checkTaskLimit('user-1'),
+      ).resolves.toBeUndefined();
+    });
+
+    it('should throw ForbiddenException when over limit', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        plan: { maxTasks: 100 },
+      });
+      mockPrisma.task.count.mockResolvedValue(100);
+
+      await expect(
+        service.checkTaskLimit('user-1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should return early when user has no plan', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        plan: null,
+      });
+
+      await expect(
+        service.checkTaskLimit('user-1'),
+      ).resolves.toBeUndefined();
+    });
   });
 
   describe('checkStorageLimit', () => {

@@ -20,7 +20,7 @@ import { GithubController } from './github.controller';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       useFactory: () => ({
-        secret: process.env.JWT_SECRET || 'dev-secret-change-in-production-abc123',
+        secret: process.env.JWT_SECRET,
         signOptions: { expiresIn: process.env.JWT_EXPIRATION || '15m' },
       }),
     }),

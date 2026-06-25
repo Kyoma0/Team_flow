@@ -36,7 +36,8 @@ export default function ProjectSettingsPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.patch(`/api/projects/${id}`, formData);
+      const payload = { ...formData, startDate: formData.startDate || undefined, endDate: formData.endDate || undefined };
+      await api.patch(`/api/projects/${id}`, payload);
       toast.success('Projeto atualizado!');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Erro ao atualizar');

@@ -1,3 +1,6 @@
+// Prisma retorna BigInt para campos como storageUsed; JSON não serializa BigInt nativamente.
+(BigInt.prototype as any).toJSON = function () { return Number(this); };
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';

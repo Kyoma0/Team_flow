@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { PrismaService } from '../common/prisma.service';
+import { PlanLimitsService } from '../common/plan-limits.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from '../common/email.service';
 import { WebhookService } from '../common/webhook.service';
@@ -9,6 +10,7 @@ import { WebhookService } from '../common/webhook.service';
 describe('TasksService', () => {
   let service: TasksService;
   let prisma: any;
+  let planLimits: any;
   let notifications: any;
   let emailService: any;
   let webhookService: any;
@@ -33,6 +35,10 @@ describe('TasksService', () => {
     },
   };
 
+  const mockPlanLimits = {
+    checkTaskLimit: jest.fn().mockResolvedValue(undefined),
+  };
+
   const mockNotifications = {
     create: jest.fn(),
   };
@@ -51,6 +57,7 @@ describe('TasksService', () => {
       providers: [
         TasksService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: PlanLimitsService, useValue: mockPlanLimits },
         { provide: NotificationsService, useValue: mockNotifications },
         { provide: EmailService, useValue: mockEmailService },
         { provide: WebhookService, useValue: mockWebhookService },
@@ -59,6 +66,7 @@ describe('TasksService', () => {
 
     service = module.get<TasksService>(TasksService);
     prisma = module.get(PrismaService);
+    planLimits = module.get(PlanLimitsService);
     notifications = module.get(NotificationsService);
     emailService = module.get(EmailService);
     webhookService = module.get(WebhookService);
@@ -91,6 +99,16 @@ describe('TasksService', () => {
       assignedTo: { id: 'user-2', username: 'jane', name: 'Jane', avatar: null },
       createdBy: { id: 'user-1', username: 'john', name: 'John', avatar: null },
     };
+
+    it('should check plan task limit before creating', async () => {
+      mockPrisma.task.create.mockResolvedValue(mockTask);
+      mockPrisma.user.findUnique.mockResolvedValueOnce({ email: 'jane@example.com' });
+      mockPrisma.project.findUnique.mockResolvedValueOnce({ name: 'Projeto Teste' });
+
+      await service.create(createDto);
+
+      expect(mockPlanLimits.checkTaskLimit).toHaveBeenCalledWith('user-1');
+    });
 
     it('should create a task and send notification + email when assigned to different user', async () => {
       mockPrisma.task.create.mockResolvedValue(mockTask);

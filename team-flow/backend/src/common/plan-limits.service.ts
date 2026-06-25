@@ -59,6 +59,25 @@ export class PlanLimitsService {
     }
   }
 
+  async checkTaskLimit(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { plan: true },
+    });
+    if (!user?.plan) return;
+
+    const taskCount = await this.prisma.task.count({
+      where: { createdById: userId },
+    });
+
+    const maxTasks = user.plan.maxTasks ?? 999999;
+    if (taskCount >= maxTasks) {
+      throw new ForbiddenException(
+        `Limite de tarefas atingido (${maxTasks}). Faça upgrade do seu plano.`,
+      );
+    }
+  }
+
   async checkFeatureAccess(userId: string, feature: string): Promise<boolean> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

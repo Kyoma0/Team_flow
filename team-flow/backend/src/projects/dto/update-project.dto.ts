@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsDateString, MinLength, IsIn } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class UpdateProjectDto {
   @IsOptional()
@@ -12,10 +13,12 @@ export class UpdateProjectDto {
 
   @IsOptional()
   @IsDateString()
+  @Transform(({ value }) => value || undefined)
   startDate?: string;
 
   @IsOptional()
   @IsDateString()
+  @Transform(({ value }) => value || undefined)
   endDate?: string;
 
   @IsOptional()

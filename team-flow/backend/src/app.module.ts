@@ -36,6 +36,7 @@ import { TagsModule } from './tags/tags.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { InviteModule } from './invites/invite.module';
 import { BoardsModule } from './boards/boards.module';
+import { CompaniesModule } from './companies/companies.module';
 import { ChatGateway } from './chat/chat.gateway';
 import { TrashController } from './trash.controller';
 import { CleanupService } from './common/cleanup.service';
@@ -94,6 +95,7 @@ import { SentryService } from './common/sentry.service';
     FavoritesModule,
     InviteModule,
     BoardsModule,
+    CompaniesModule,
   ],
   controllers: [TrashController],
   providers: [

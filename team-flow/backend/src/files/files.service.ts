@@ -1,10 +1,9 @@
 import {
   Injectable,
   NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-import { MinioService } from '../common/minio.service';
+import { StorageService } from '../common/storage.service';
 import { PlanLimitsService } from '../common/plan-limits.service';
 import { v4 as uuid } from 'uuid';
 import * as path from 'path';
@@ -13,7 +12,7 @@ import * as path from 'path';
 export class FilesService {
   constructor(
     private prisma: PrismaService,
-    private minio: MinioService,
+    private storage: StorageService,
     private planLimits: PlanLimitsService,
   ) {}
 
@@ -25,10 +24,20 @@ export class FilesService {
     groupId?: string,
   ) {
     await this.planLimits.checkStorageLimit(userId, file.size);
+
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { company: true, owner: true },
+    });
+    if (!project) throw new NotFoundException('Projeto não encontrado');
+
+    const companyName = project.company?.name || project.owner.name;
+    const userIdentifier = project.owner.username || project.owner.email;
     const ext = path.extname(file.originalname);
     const fileName = `${uuid()}${ext}`;
+    const relativePath = this.storage.getRelativePath(companyName, userIdentifier, fileName);
 
-    await this.minio.upload(fileName, file.buffer, file.mimetype);
+    await this.storage.upload(file.buffer, companyName, userIdentifier, fileName, file.mimetype);
 
     const newFile = await this.prisma.file.create({
       data: {
@@ -36,7 +45,7 @@ export class FilesService {
         originalName: file.originalname,
         mimeType: file.mimetype,
         size: file.size,
-        key: fileName,
+        key: relativePath,
         projectId,
         taskId,
         groupId,
@@ -53,10 +62,15 @@ export class FilesService {
         name: fileName,
         originalName: file.originalname,
         size: file.size,
-        key: fileName,
+        key: relativePath,
         fileId: newFile.id,
         uploadedById: userId,
       },
+    });
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { storageUsed: { increment: file.size } },
     });
 
     return newFile;
@@ -99,7 +113,8 @@ export class FilesService {
     const file = await this.prisma.file.findUnique({ where: { id } });
     if (!file) throw new NotFoundException('Arquivo não encontrado');
 
-    const result = await this.minio.download(file.name);
+    const fullPath = this.storage.getFullPath(file.key);
+    const result = await this.storage.download(fullPath);
     if (!result.exists || !result.stream) throw new NotFoundException('Arquivo não encontrado no armazenamento');
 
     return { file, stream: result.stream };
@@ -109,31 +124,48 @@ export class FilesService {
     const file = await this.prisma.file.findUnique({ where: { id } });
     if (!file) throw new NotFoundException('Arquivo não encontrado');
 
-    await this.minio.remove(file.name);
+    const fullPath = this.storage.getFullPath(file.key);
+    await this.storage.remove(fullPath);
     await this.prisma.file.delete({ where: { id } });
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { storageUsed: { decrement: file.size } },
+    });
     return { message: 'Arquivo excluído' };
   }
 
   async uploadVersion(id: string, file: Express.Multer.File, userId: string) {
-    const existing = await this.prisma.file.findUnique({ where: { id } });
+    const existing = await this.prisma.file.findUnique({
+      where: { id },
+      include: { project: { include: { company: true, owner: true } } },
+    });
     if (!existing) throw new NotFoundException('Arquivo não encontrado');
 
+    const companyName = existing.project.company?.name || existing.project.owner.name;
+    const userIdentifier = existing.project.owner.username || existing.project.owner.email;
     const ext = path.extname(file.originalname);
     const newVersion = existing.version + 1;
     const fileName = `${uuid()}${ext}`;
+    const relativePath = this.storage.getRelativePath(companyName, userIdentifier, fileName);
 
-    await this.minio.upload(fileName, file.buffer, file.mimetype);
+    await this.storage.upload(file.buffer, companyName, userIdentifier, fileName, file.mimetype);
 
     await this.prisma.fileVersion.create({
       data: {
-        version: existing.version,
-        name: existing.name,
-        originalName: existing.originalName,
-        size: existing.size,
-        key: existing.key,
+        version: newVersion,
+        name: fileName,
+        originalName: file.originalname,
+        size: file.size,
+        key: relativePath,
         fileId: id,
         uploadedById: userId,
       },
+    });
+
+    const sizeDiff = file.size - existing.size;
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { storageUsed: { increment: sizeDiff } },
     });
 
     return this.prisma.file.update({
@@ -143,7 +175,7 @@ export class FilesService {
         originalName: file.originalname,
         mimeType: file.mimetype,
         size: file.size,
-        key: fileName,
+        key: relativePath,
         version: newVersion,
       },
       include: { uploadedBy: { select: { id: true, name: true } } },
@@ -166,7 +198,8 @@ export class FilesService {
     const version = await this.prisma.fileVersion.findUnique({ where: { id: versionId } });
     if (!version) throw new NotFoundException('Versão não encontrada');
 
-    const result = await this.minio.download(version.key || version.name);
+    const fullPath = this.storage.getFullPath(version.key || version.name);
+    const result = await this.storage.download(fullPath);
     if (!result.exists || !result.stream)
       throw new NotFoundException('Arquivo não encontrado no armazenamento');
 

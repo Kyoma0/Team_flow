@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-github2';
 import { PrismaService } from '../common/prisma.service';
@@ -9,11 +9,14 @@ import * as crypto from 'crypto';
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
   constructor(private prisma: PrismaService) {
     super({
-      clientID: process.env.GITHUB_CLIENT_ID || '',
-      clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+      clientID: process.env.GITHUB_CLIENT_ID || 'missing',
+      clientSecret: process.env.GITHUB_CLIENT_SECRET || 'missing',
       callbackURL: process.env.GITHUB_CALLBACK_URL || 'http://localhost:3001/api/auth/github/callback',
       scope: ['user:email'],
     });
+    if (!process.env.GITHUB_CLIENT_ID) {
+      Logger.warn('GitHub OAuth não configurado — pule GITHUB_CLIENT_ID e GITHUB_CLIENT_SECRET no .env');
+    }
   }
 
   async validate(accessToken: string, refreshToken: string, profile: any, done: any) {

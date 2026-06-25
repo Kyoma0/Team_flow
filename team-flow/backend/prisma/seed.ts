@@ -104,8 +104,11 @@ async function main() {
   const demo = await prisma.user.create({
     data: { username: 'demo', name: 'Demo User', email: 'demo@teamflow.app', password, avatar: '', roleType: 'EMPLOYEE', planId: freePlan.id, emailVerified: true },
   });
+  const admin = await prisma.user.create({
+    data: { username: 'admin', name: 'Administrador', email: 'admin@teamflow.app', password, avatar: '', roleType: 'ADMIN', planId: proPlan.id, emailVerified: true },
+  });
 
-  const users = [ana, carlos, julia, marcos, demo];
+  const users = [ana, carlos, julia, marcos, demo, admin];
 
   // Projects
   const project1 = await prisma.project.create({
@@ -399,6 +402,7 @@ async function main() {
   console.log('✅ Seed concluído com sucesso!');
   console.log('');
   console.log('📧 Contas de demonstração:');
+  console.log('   admin@teamflow.app / 123456 — ADMIN');
   console.log('   ana@teamflow.app / 123456');
   console.log('   carlos@teamflow.app / 123456');
   console.log('   julia@teamflow.app / 123456');

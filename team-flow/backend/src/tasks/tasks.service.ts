@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { PlanLimitsService } from '../common/plan-limits.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from '../common/email.service';
 import { WebhookService } from '../common/webhook.service';
@@ -8,6 +9,7 @@ import { WebhookService } from '../common/webhook.service';
 export class TasksService {
   constructor(
     private prisma: PrismaService,
+    private planLimits: PlanLimitsService,
     private notifications: NotificationsService,
     private emailService: EmailService,
     private webhookService: WebhookService,
@@ -41,6 +43,7 @@ export class TasksService {
     recurring?: string;
     repeatUntil?: string;
   }) {
+    await this.planLimits.checkTaskLimit(data.createdById);
     const boardColumn = data.boardColumnId
       ? await this.getBoardColumnForProject(data.boardColumnId, data.projectId)
       : null;

@@ -1,11 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { Mail, Lock, User, UserPlus, Eye, EyeOff, Briefcase, AtSign } from 'lucide-react';
+import { Mail, Lock, User, UserPlus, Eye, EyeOff, Briefcase, AtSign, Search, Building2, Plus, Check } from 'lucide-react';
+import api from '@/lib/api';
+
+interface CompanyOption {
+  id: string; name: string; slug: string; logo?: string;
+}
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -15,19 +20,64 @@ export default function RegisterPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [roleType, setRoleType] = useState('EMPLOYEE');
+
+  // Company flow
+  const [companyMode, setCompanyMode] = useState<'create' | 'join' | null>(null);
+  const [companyName, setCompanyName] = useState('');
+  const [companySearch, setCompanySearch] = useState('');
+  const [companyResults, setCompanyResults] = useState<CompanyOption[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<CompanyOption | null>(null);
+  const [searching, setSearching] = useState(false);
+  const searchTimeout = useRef<NodeJS.Timeout>();
+
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (roleType === 'LEADER') {
+      setCompanyMode(null);
+    } else {
+      setCompanyMode('join');
+      setSelectedCompany(null);
+      setCompanySearch('');
+      setCompanyResults([]);
+    }
+  }, [roleType]);
+
+  useEffect(() => {
+    if (companyMode !== 'join' || companySearch.length < 2) {
+      setCompanyResults([]);
+      return;
+    }
+    clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const { data } = await api.get(`/api/companies/search?q=${encodeURIComponent(companySearch)}`);
+        setCompanyResults(data);
+      } catch { setCompanyResults([]); }
+      finally { setSearching(false); }
+    }, 300);
+    return () => clearTimeout(searchTimeout.current);
+  }, [companySearch, companyMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await register(name, email, password, username, roleType);
+      const companyId = selectedCompany?.id;
+      const submitCompanyName = companyMode === 'create' ? companyName : undefined;
+      await register(name, email, password, username, roleType, submitCompanyName, companyId);
       toast.success('Conta criada!');
-      router.push('/dashboard');
+      setLoading(false);
+      window.location.href = '/dashboard';
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao criar conta');
-    } finally {
+      console.error('[Register] Erro completo:', err);
+      console.error('[Register] Response:', err.response?.data);
+      console.error('[Register] Status:', err.response?.status);
+      const msg = err.response?.data?.message;
+      const errorMsg = Array.isArray(msg) ? msg[0] : msg || 'Erro ao criar conta';
+      toast.error(errorMsg);
       setLoading(false);
     }
   };
@@ -130,6 +180,87 @@ export default function RegisterPage() {
                   </select>
                 </div>
               </div>
+
+              {roleType === 'LEADER' && !companyMode && (
+                <div className="space-y-3 pt-2">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Vínculo com empresa</p>
+                  <button type="button" onClick={() => setCompanyMode('create')}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-all text-left">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                      <Plus className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">Criar nova empresa</p>
+                      <p className="text-xs text-gray-400">Vou registrar minha empresa no TeamFlow</p>
+                    </div>
+                  </button>
+                  <button type="button" onClick={() => setCompanyMode('join')}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all text-left">
+                    <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                      <Search className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">Fazer parte de uma empresa</p>
+                      <p className="text-xs text-gray-400">Já existe uma empresa que eu faço parte</p>
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {roleType === 'LEADER' && companyMode === 'create' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-sm font-medium">Nova empresa</label>
+                    <button type="button" onClick={() => { setCompanyMode(null); setCompanyName(''); }}
+                      className="text-xs text-gray-400 hover:text-gray-600">Alterar</button>
+                  </div>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                      placeholder="Nome da sua empresa" />
+                  </div>
+                </div>
+              )}
+
+              {(roleType === 'LEADER' || roleType === 'EMPLOYEE') && companyMode === 'join' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-sm font-medium">{roleType === 'LEADER' ? 'Buscar empresa' : 'Empresa'}</label>
+                    {roleType === 'LEADER' && (
+                      <button type="button" onClick={() => { setCompanyMode(null); setCompanySearch(''); setSelectedCompany(null); }}
+                        className="text-xs text-gray-400 hover:text-gray-600">Alterar</button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input type="text" value={companySearch} onChange={(e) => { setCompanySearch(e.target.value); setSelectedCompany(null); }}
+                      placeholder="Digite o nome da empresa..."
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all" />
+                  </div>
+
+                  {selectedCompany ? (
+                    <div className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-sm">
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span className="font-medium">{selectedCompany.name}</span>
+                    </div>
+                  ) : (
+                    <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
+                      {searching && <p className="text-xs text-gray-400 text-center py-2">Buscando...</p>}
+                      {!searching && companyResults.length === 0 && companySearch.length >= 2 && (
+                        <p className="text-xs text-gray-400 text-center py-2">Nenhuma empresa encontrada</p>
+                      )}
+                      {companyResults.map((c) => (
+                        <button key={c.id} type="button" onClick={() => setSelectedCompany(c)}
+                          className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-left text-sm transition-colors">
+                          <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          <span>{c.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="text-sm text-center">
                 <span className="text-gray-500 dark:text-gray-400">Já tem conta? </span>

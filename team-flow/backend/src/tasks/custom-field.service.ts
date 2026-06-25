@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { PlanLimitsService } from '../common/plan-limits.service';
 
 @Injectable()
 export class CustomFieldService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private planLimits: PlanLimitsService,
+  ) {}
 
   async findByProject(projectId: string) {
     return this.prisma.customField.findMany({
@@ -12,7 +16,12 @@ export class CustomFieldService {
     });
   }
 
-  async create(data: { name: string; type: string; required?: boolean; options?: string[]; projectId: string }) {
+  async create(data: { name: string; type: string; required?: boolean; options?: string[]; projectId: string; userId?: string }) {
+    const project = await this.prisma.project.findUnique({ where: { id: data.projectId }, select: { ownerId: true } });
+    if (project && data.userId) {
+      await this.planLimits.assertFeatureAccess(data.userId, 'custom_fields', 'campos personalizados');
+    }
+
     const existing = await this.prisma.customField.findFirst({
       where: { projectId: data.projectId, name: data.name },
     });

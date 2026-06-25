@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { TasksController } from './tasks.controller';
+import { PlanLimitsService } from '../common/plan-limits.service';
 import { TimeTrackingService } from './time-tracking.service';
 import { TimeTrackingController } from './time-tracking.controller';
 import { TaskTemplateService } from './task-template.service';
@@ -20,7 +21,7 @@ import { WebhookModule } from '../webhooks/webhook.module';
 @Module({
   imports: [NotificationsModule, WebhookModule],
   controllers: [TasksController, TimeTrackingController, TaskTemplateController, CustomFieldController, TaskCommentController, TaskWatcherController, ChecklistController],
-  providers: [TasksService, TimeTrackingService, TaskTemplateService, CustomFieldService, TaskCommentService, TaskWatcherService, RecurringTaskService, ChecklistService],
+  providers: [TasksService, PlanLimitsService, TimeTrackingService, TaskTemplateService, CustomFieldService, TaskCommentService, TaskWatcherService, RecurringTaskService, ChecklistService],
   exports: [TasksService, TimeTrackingService, TaskTemplateService, CustomFieldService, TaskCommentService, TaskWatcherService, RecurringTaskService, ChecklistService],
 })
 export class TasksModule {}
