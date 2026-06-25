@@ -5,8 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { Model3DViewer } from '@/components/viewer/Model3DViewer';
 import { ArrowLeft } from 'lucide-react';
-
-const SUPPORTED_3D_FORMATS = ['glb', 'gltf', 'fbx', 'obj', 'stl'] as const;
+import { SUPPORTED_3D_FORMATS } from '@/lib/utils';
 
 export default function ViewerPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,24 +14,35 @@ export default function ViewerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+
   useEffect(() => {
     if (!id) return;
-    api
-      .get(`/api/files/${id}`)
-      .then(({ data }) => {
-        const ext = data.originalName?.split('.').pop()?.toLowerCase();
-        if (!ext || !SUPPORTED_3D_FORMATS.includes(ext)) {
-          setError(`Formato não suportado para visualização 3D: .${ext}`);
-          setLoading(false);
-          return;
+    let cancelled = false;
+
+    api.get(`/api/files/${id}`).then(async ({ data }) => {
+      const ext = data.originalName?.split('.').pop()?.toLowerCase();
+      if (!ext || !SUPPORTED_3D_FORMATS.includes(ext)) {
+        if (!cancelled) setError(`Formato não suportado para visualização 3D: .${ext}`);
+        return;
+      }
+
+      try {
+        const { data: blob } = await api.get(`/api/files/${id}/download`, { responseType: 'blob' });
+        if (!cancelled) {
+          setFile(data);
+          setBlobUrl(URL.createObjectURL(blob));
         }
-        setFile(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError('Arquivo não encontrado');
-        setLoading(false);
-      });
+      } catch {
+        if (!cancelled) setError('Erro ao carregar arquivo para visualização');
+      }
+    }).catch(() => {
+      if (!cancelled) setError('Arquivo não encontrado');
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => { cancelled = true; };
   }, [id]);
 
   if (loading) {
@@ -43,7 +53,7 @@ export default function ViewerPage() {
     );
   }
 
-  if (error || !file) {
+  if (error || !file || !blobUrl) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4">
         <p className="text-gray-500 dark:text-gray-400">{error || 'Arquivo não encontrado'}</p>
@@ -58,7 +68,6 @@ export default function ViewerPage() {
   }
 
   const ext = file.originalName.split('.').pop()?.toLowerCase() as typeof SUPPORTED_3D_FORMATS[number];
-  const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/files/${file.id}/download`;
 
   return (
     <div className="h-full flex flex-col">
@@ -78,7 +87,7 @@ export default function ViewerPage() {
       </div>
 
       <div className="flex-1 rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700">
-        <Model3DViewer url={downloadUrl} format={ext} fileName={file.originalName} />
+        <Model3DViewer url={blobUrl} format={ext} fileName={file.originalName} />
       </div>
     </div>
   );

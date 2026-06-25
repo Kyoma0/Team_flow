@@ -8,11 +8,9 @@ import {
   History, RotateCcw, X, Eye, List, LayoutGrid,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatBytes, formatDate, formatDateTime } from '@/lib/utils';
+import { formatBytes, formatDate, formatDateTime, is3DModel } from '@/lib/utils';
 import { getFileIcon, formatFileSize } from '@/lib/file-icons';
 import Link from 'next/link';
-
-const SUPPORTED_3D_FORMATS = ['glb', 'gltf', 'fbx', 'obj', 'stl'];
 
 export default function ProjectFilesPage() {
   const { id } = useParams();
@@ -218,7 +216,7 @@ export default function ProjectFilesPage() {
                     <Eye className="w-4 h-4" />
                   </button>
                 )}
-                {SUPPORTED_3D_FORMATS.includes(file.originalName?.split('.').pop()?.toLowerCase()) && (
+                {is3DModel(file.originalName) && (
                   <Link
                     href={`/viewer/${file.id}`}
                     className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-blue-500"

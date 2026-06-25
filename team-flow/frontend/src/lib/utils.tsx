@@ -79,3 +79,10 @@ export function getPriorityColor(priority: string) {
     default: return 'bg-gray-100 text-gray-700';
   }
 }
+
+export const SUPPORTED_3D_FORMATS = ['glb', 'gltf', 'fbx', 'obj', 'stl'] as const;
+
+export function is3DModel(fileName: string): boolean {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  return !!ext && (SUPPORTED_3D_FORMATS as readonly string[]).includes(ext);
+}

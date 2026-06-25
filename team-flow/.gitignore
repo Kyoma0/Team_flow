@@ -9,4 +9,6 @@ backend/data.sqlite-shm
 backend/data.sqlite-wal
 backend/uploads/*
 !backend/uploads/.gitkeep
+backend/terabox_storage/*
+!backend/terabox_storage/.gitkeep
 .next

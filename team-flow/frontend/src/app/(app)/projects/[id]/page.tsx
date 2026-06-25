@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { getTaskSocket } from '@/lib/socket';
 import {
   DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors,
@@ -11,7 +11,7 @@ import {
   SortableContext, verticalListSortingStrategy, useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, GripVertical, Trash2, MessageSquare, Calendar, User, X, AtSign, List, Columns, CalendarDays, Paperclip, Filter, Clock, Play, Square, BarChart3, UserPlus, Eye, CheckSquare, Tags, Star, Settings2 } from 'lucide-react';
+import { Plus, GripVertical, Trash2, MessageSquare, Calendar, User, X, AtSign, List, Columns, CalendarDays, Paperclip, Filter, Clock, Play, Square, BarChart3, UserPlus, Eye, CheckSquare, Tags, Star, Settings2, Box } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const GanttChart = dynamic(
@@ -19,7 +19,7 @@ const GanttChart = dynamic(
   { ssr: false, loading: () => <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded-xl h-64" /> }
 );
 import toast from 'react-hot-toast';
-import { getStatusLabel, getPriorityLabel, getPriorityColor, getStatusColor, renderMentions } from '@/lib/utils';
+import { getStatusLabel, getPriorityLabel, getPriorityColor, getStatusColor, renderMentions, is3DModel } from '@/lib/utils';
 import MentionsInput from '@/components/MentionsInput';
 import TaskComments from '@/components/TaskComments';
 import TaskChecklist from '@/components/TaskChecklist';
@@ -141,12 +141,14 @@ function Column({ column, tasks, onAddTask, onTaskClick, getIsFavorite, onToggle
 
 export default function ProjectBoardPage() {
   const { id } = useParams();
+  const router = useRouter();
   const [tasks, setTasks] = useState<any[]>([]);
   const [activeTask, setActiveTask] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [selectedTask, setSelectedTask] = useState<any>(null);
+  const selectedTaskIdRef = useRef<string | null>(null);
   const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'calendar' | 'gantt'>('kanban');
   const [formData, setFormData] = useState({
     title: '', description: '', status: 'NOT_STARTED', priority: 'MEDIUM', dueDate: '', assignedToId: '', boardColumnId: '', recurring: '', repeatUntil: '',
@@ -338,7 +340,30 @@ export default function ProjectBoardPage() {
     }
   }, [selectedTask?.id]);
 
+  const handleTaskClick = async (taskId: string) => {
+    selectedTaskIdRef.current = taskId;
+    const resumo = tasks.find((t) => t.id === taskId) || null;
+    setSelectedTask(resumo);
+
+    try {
+      const { data } = await api.get(`/api/tasks/${taskId}`);
+      if (selectedTaskIdRef.current === taskId) {
+        setSelectedTask(data);
+      }
+    } catch (err) {
+      if (selectedTaskIdRef.current === taskId) {
+        console.error('Falha ao buscar detalhes completos da tarefa', err);
+      }
+    }
+  };
+
+  const closeTaskPanel = () => {
+    selectedTaskIdRef.current = null;
+    setSelectedTask(null);
+  };
+
   const handleSelectTask = (task: any) => {
+    selectedTaskIdRef.current = task?.id || null;
     setSelectedTask(task);
     if (task) {
       fetchTimeEntries(task.id);
@@ -349,6 +374,14 @@ export default function ProjectBoardPage() {
         data.forEach((v: any) => { vals[v.customFieldId] = v.value || ''; });
         setFieldValues(vals);
       });
+      if (!task.files) {
+        const currentId = task.id;
+        api.get(`/api/tasks/${currentId}`).then(({ data }) => {
+          if (selectedTaskIdRef.current === currentId) {
+            setSelectedTask(data);
+          }
+        }).catch(() => {});
+      }
     }
   };
 
@@ -543,7 +576,7 @@ export default function ProjectBoardPage() {
     if (!confirm('Mover para a lixeira?')) return;
     await api.delete(`/api/tasks/${taskId}/soft`);
     toast.success('Tarefa movida para lixeira');
-    setSelectedTask(null);
+    closeTaskPanel();
     fetchTasks();
   };
 
@@ -551,7 +584,7 @@ export default function ProjectBoardPage() {
     if (!confirm('Excluir esta tarefa permanentemente?')) return;
     await api.delete(`/api/tasks/${taskId}`);
     toast.success('Tarefa excluída');
-    setSelectedTask(null);
+    closeTaskPanel();
     fetchTasks();
   };
 
@@ -793,7 +826,7 @@ export default function ProjectBoardPage() {
             priority: t.priority,
             assigneeName: t.assignee?.name,
           }))}
-          onTaskClick={(taskId) => setSelectedTask(tasks.find((t) => t.id === taskId) || null)}
+          onTaskClick={(taskId) => handleTaskClick(taskId)}
         />
       ) : viewMode === 'gantt' ? (
         <GanttChart
@@ -808,7 +841,7 @@ export default function ProjectBoardPage() {
             dependencies: t.dependencies?.map((d: any) => d.dependsOnId),
             type: 'task' as const,
           }))}
-          onTaskClick={(taskId) => { setSelectedTask(tasks.find((t) => t.id === taskId) || null); }}
+          onTaskClick={(taskId) => handleTaskClick(taskId)}
         />
       ) : null}
 
@@ -871,7 +904,7 @@ export default function ProjectBoardPage() {
 
       {/* Task detail panel */}
       {selectedTask && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={() => setSelectedTask(null)}>
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={closeTaskPanel}>
           <div className="w-full max-w-lg bg-white dark:bg-slate-800 h-full overflow-y-auto p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">{selectedTask.title}</h2>
@@ -895,7 +928,7 @@ export default function ProjectBoardPage() {
                   <Eye className="w-3 h-3" />
                   {isWatching ? 'Observando' : 'Observar'} ({watcherCount})
                 </button>
-                <button onClick={() => setSelectedTask(null)}><X className="w-5 h-5" /></button>
+                <button onClick={closeTaskPanel}><X className="w-5 h-5" /></button>
               </div>
             </div>
             <div className="space-y-4">
@@ -1095,6 +1128,62 @@ export default function ProjectBoardPage() {
                 </div>
               )}
 
+              {/* Files */}
+              {selectedTask.files?.length > 0 && (
+                <div className="pt-4 border-t dark:border-slate-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Paperclip className="w-4 h-4" />
+                    <h3 className="text-sm font-semibold">Arquivos ({selectedTask.files.length})</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {selectedTask.files.map((file: any) => (
+                      <div key={file.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{file.originalName}</p>
+                          <p className="text-xs text-gray-500">
+                            {file.size > 1024 * 1024
+                              ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+                              : `${(file.size / 1024).toFixed(0)} KB`}
+                            {file.uploadedBy?.name && ` · ${file.uploadedBy.name}`}
+                            {` · ${new Date(file.createdAt).toLocaleDateString()}`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0 ml-3">
+                          {is3DModel(file.originalName) && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); router.push(`/viewer/${file.id}`); }}
+                              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                              title="Visualizar em 3D"
+                            >
+                              <Box className="w-3 h-3" /> 3D
+                            </button>
+                          )}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                const { data: blob } = await api.get(`/api/files/${file.id}/download`, { responseType: 'blob' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = file.originalName;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              } catch {
+                                toast.error('Erro ao baixar arquivo');
+                              }
+                            }}
+                            className="px-3 py-1 text-xs font-medium text-primary-600 bg-primary-50 dark:bg-primary-900/30 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/50"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <TaskComments taskId={selectedTask.id} />
 
               <TaskChecklist taskId={selectedTask.id} />
@@ -1147,7 +1236,7 @@ export default function ProjectBoardPage() {
               </div>
 
               <div className="flex gap-2 pt-4 border-t dark:border-slate-700">
-                <button onClick={() => { openEditModal(selectedTask); setSelectedTask(null); }}
+                <button onClick={() => { openEditModal(selectedTask); closeTaskPanel(); }}
                   className="flex-1 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700">
                   Editar
                 </button>
