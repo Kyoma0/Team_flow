@@ -6,7 +6,7 @@ Plataforma SaaS de gestão de projetos para equipes criativas (estúdios de Blen
 
 - **Frontend:** Next.js 14, React 18, TypeScript, Tailwind CSS
 - **Backend:** NestJS, TypeScript, Prisma ORM
-- **Database:** PostgreSQL
+- **Database:** SQLite
 - **Cache:** Redis (opcional)
 - **Storage:** MinIO / S3
 - **Realtime:** Socket.IO

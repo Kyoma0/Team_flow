@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '@/lib/api';
 import Link from 'next/link';
 import { Plus, FolderKanban, MoreHorizontal, Search, Filter, Building2, Star, ListChecks, Users, Layers } from 'lucide-react';
@@ -38,6 +38,14 @@ export default function ProjectsPage() {
   };
 
   useEffect(() => { fetchProjects(); }, []);
+
+  const fetchProjectsRef = useRef(fetchProjects);
+  fetchProjectsRef.current = fetchProjects;
+
+  useEffect(() => {
+    const interval = setInterval(() => fetchProjectsRef.current(), 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   const openCreateModal = async () => {
     setShowCreateModal(true);

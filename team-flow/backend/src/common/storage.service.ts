@@ -45,6 +45,14 @@ export class StorageService implements OnModuleInit {
     }
   }
 
+  ensureDir(subPath: string): string {
+    const dir = path.join(this.root, subPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    return dir;
+  }
+
   getRelativePath(companyName: string, userIdentifier: string, fileName: string): string {
     return path.join(this.sanitize(companyName), this.sanitize(userIdentifier), fileName);
   }
@@ -53,7 +61,7 @@ export class StorageService implements OnModuleInit {
     return path.join(this.root, relativePath);
   }
 
-  private sanitize(name: string): string {
+  sanitize(name: string): string {
     return name.replace(/[^a-zA-Z0-9_\-@.]/g, '_').toLowerCase();
   }
 }

@@ -3,10 +3,11 @@ import { FilesService } from './files.service';
 import { FilesController } from './files.controller';
 import { StorageService } from '../common/storage.service';
 import { PlanLimitsService } from '../common/plan-limits.service';
+import { AuthOrApiTokenGuard } from '../common/guards/auth-or-api-token.guard';
 
 @Module({
   controllers: [FilesController],
-  providers: [FilesService, StorageService, PlanLimitsService],
+  providers: [FilesService, StorageService, PlanLimitsService, AuthOrApiTokenGuard],
   exports: [FilesService, StorageService],
 })
 export class FilesModule {}

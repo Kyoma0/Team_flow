@@ -13,14 +13,14 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery, ApiBody, ApiResponse, ApiCreatedResponse, ApiConsumes } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FilesService } from './files.service';
-import { AuthGuard } from '../common/guards/auth.guard';
+import { AuthOrApiTokenGuard } from '../common/guards/auth-or-api-token.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuditService } from '../audit/audit.service';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Response } from 'express';
 
 @Controller('files')
-@UseGuards(AuthGuard)
+@UseGuards(AuthOrApiTokenGuard)
 @ApiTags('Arquivos')
 @ApiBearerAuth()
 export class FilesController {

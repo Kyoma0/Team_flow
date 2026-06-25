@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../common/prisma.service';
 import { PlanLimitsService } from '../common/plan-limits.service';
 import { BoardsService } from '../boards/boards.service';
+import { StorageService } from '../common/storage.service';
 
 @Injectable()
 export class ProjectsService {
@@ -9,6 +10,7 @@ export class ProjectsService {
     private prisma: PrismaService,
     private planLimits: PlanLimitsService,
     private boardsService: BoardsService,
+    private storageService: StorageService,
   ) {}
 
   async create(data: {
@@ -39,6 +41,7 @@ export class ProjectsService {
       },
     });
     await this.boardsService.createDefaultBoard(project.id);
+    this.storageService.ensureDir(this.storageService.sanitize(project.name));
     return project;
   }
 

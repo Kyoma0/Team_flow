@@ -1,22 +1,6 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: teamflow
-      POSTGRES_PASSWORD: teamflow
-      POSTGRES_DB: teamflow
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U teamflow"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: redis:7-alpine
     ports:
@@ -53,7 +37,7 @@ services:
     ports:
       - "3001:3001"
     environment:
-      DATABASE_URL: postgresql://teamflow:teamflow@postgres:5432/teamflow
+      DATABASE_URL: file:./prisma/dev.db
       REDIS_URL: redis://redis:6379
       MINIO_ENDPOINT: minio
       MINIO_PORT: "9000"
@@ -69,14 +53,13 @@ services:
       SMTP_PASS: ""
       CORS_ORIGIN: http://localhost:3000
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       minio:
         condition: service_healthy
     volumes:
       - backend_uploads:/app/uploads
+      - backend_db:/app/prisma
 
   frontend:
     build:
@@ -91,7 +74,7 @@ services:
       - backend
 
 volumes:
-  postgres_data:
   redis_data:
   minio_data:
   backend_uploads:
+  backend_db:

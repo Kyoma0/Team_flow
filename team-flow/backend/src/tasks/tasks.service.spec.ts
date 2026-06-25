@@ -6,6 +6,7 @@ import { PlanLimitsService } from '../common/plan-limits.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from '../common/email.service';
 import { WebhookService } from '../common/webhook.service';
+import { TaskGateway } from './task.gateway';
 
 describe('TasksService', () => {
   let service: TasksService;
@@ -29,6 +30,7 @@ describe('TasksService', () => {
     },
     project: {
       findUnique: jest.fn(),
+      update: jest.fn().mockResolvedValue({ id: 'project-1' }),
     },
     user: {
       findUnique: jest.fn(),
@@ -52,6 +54,12 @@ describe('TasksService', () => {
     dispatch: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockTaskGateway = {
+    emitTaskCreated: jest.fn(),
+    emitTaskUpdated: jest.fn(),
+    emitTaskDeleted: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -61,6 +69,7 @@ describe('TasksService', () => {
         { provide: NotificationsService, useValue: mockNotifications },
         { provide: EmailService, useValue: mockEmailService },
         { provide: WebhookService, useValue: mockWebhookService },
+        { provide: TaskGateway, useValue: mockTaskGateway },
       ],
     }).compile();
 
@@ -108,6 +117,11 @@ describe('TasksService', () => {
       await service.create(createDto);
 
       expect(mockPlanLimits.checkTaskLimit).toHaveBeenCalledWith('user-1');
+      expect(mockPrisma.project.update).toHaveBeenCalledWith({
+        where: { id: 'project-1' },
+        data: { updatedAt: expect.any(Date) },
+      });
+      expect(mockTaskGateway.emitTaskCreated).toHaveBeenCalledWith(mockTask);
     });
 
     it('should create a task and send notification + email when assigned to different user', async () => {
@@ -155,6 +169,11 @@ describe('TasksService', () => {
         'Projeto Teste',
       );
       expect(result).toEqual(mockTask);
+      expect(mockPrisma.project.update).toHaveBeenCalledWith({
+        where: { id: 'project-1' },
+        data: { updatedAt: expect.any(Date) },
+      });
+      expect(mockTaskGateway.emitTaskCreated).toHaveBeenCalledWith(mockTask);
     });
 
     it('should NOT send notification or email when assigned to self', async () => {
@@ -165,6 +184,11 @@ describe('TasksService', () => {
 
       expect(mockNotifications.create).not.toHaveBeenCalled();
       expect(mockEmailService.sendTaskNotification).not.toHaveBeenCalled();
+      expect(mockPrisma.project.update).toHaveBeenCalledWith({
+        where: { id: 'project-1' },
+        data: { updatedAt: expect.any(Date) },
+      });
+      expect(mockTaskGateway.emitTaskCreated).toHaveBeenCalled();
     });
   });
 
@@ -281,6 +305,11 @@ describe('TasksService', () => {
         'Old Task',
         'Projeto Teste',
       );
+      expect(mockPrisma.project.update).toHaveBeenCalledWith({
+        where: { id: 'project-1' },
+        data: { updatedAt: expect.any(Date) },
+      });
+      expect(mockTaskGateway.emitTaskUpdated).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when task does not exist', async () => {

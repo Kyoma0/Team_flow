@@ -4,6 +4,7 @@ import { PlanLimitsService } from '../common/plan-limits.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from '../common/email.service';
 import { WebhookService } from '../common/webhook.service';
+import { TaskGateway } from './task.gateway';
 
 @Injectable()
 export class TasksService {
@@ -13,6 +14,7 @@ export class TasksService {
     private notifications: NotificationsService,
     private emailService: EmailService,
     private webhookService: WebhookService,
+    private taskGateway: TaskGateway,
   ) {}
 
   async findByUser(userId: string) {
@@ -90,6 +92,9 @@ export class TasksService {
     }
 
     await this.webhookService.dispatch('task.created', task, task.projectId).catch(() => {});
+
+    await this.touchProject(task.projectId);
+    this.taskGateway.emitTaskCreated(task);
 
     return task;
   }
@@ -263,6 +268,9 @@ export class TasksService {
 
     await this.webhookService.dispatch('task.updated', updated, task.projectId).catch(() => {});
 
+    await this.touchProject(task.projectId);
+    this.taskGateway.emitTaskUpdated(updated);
+
     return updated;
   }
 
@@ -311,6 +319,8 @@ export class TasksService {
     const task = await this.prisma.task.findUnique({ where: { id } });
     if (!task) throw new NotFoundException('Tarefa não encontrada');
     await this.prisma.task.delete({ where: { id } });
+    await this.touchProject(task.projectId);
+    this.taskGateway.emitTaskDeleted(task.projectId, id);
     return { message: 'Tarefa excluída' };
   }
 
@@ -345,17 +355,25 @@ export class TasksService {
   }
 
   async softDelete(id: string) {
-    return this.prisma.task.update({
+    const task = await this.prisma.task.findUniqueOrThrow({ where: { id } });
+    const updated = await this.prisma.task.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
+    await this.touchProject(task.projectId);
+    this.taskGateway.emitTaskUpdated(updated);
+    return updated;
   }
 
   async restore(id: string) {
-    return this.prisma.task.update({
+    const task = await this.prisma.task.findUniqueOrThrow({ where: { id } });
+    const updated = await this.prisma.task.update({
       where: { id },
       data: { deletedAt: null },
     });
+    await this.touchProject(task.projectId);
+    this.taskGateway.emitTaskUpdated(updated);
+    return updated;
   }
 
   async getTrash(projectId: string) {
@@ -369,6 +387,13 @@ export class TasksService {
   private async createHistory(taskId: string, userId: string, field: string, oldValue?: string, newValue?: string) {
     return this.prisma.taskHistory.create({
       data: { taskId, userId, field, oldValue, newValue },
+    });
+  }
+
+  private async touchProject(projectId: string) {
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: { updatedAt: new Date() },
     });
   }
 

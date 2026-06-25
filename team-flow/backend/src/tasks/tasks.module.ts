@@ -17,11 +17,13 @@ import { ChecklistService } from './checklist.service';
 import { ChecklistController } from './checklist.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { WebhookModule } from '../webhooks/webhook.module';
+import { AuthOrApiTokenGuard } from '../common/guards/auth-or-api-token.guard';
+import { TaskGateway } from './task.gateway';
 
 @Module({
   imports: [NotificationsModule, WebhookModule],
   controllers: [TasksController, TimeTrackingController, TaskTemplateController, CustomFieldController, TaskCommentController, TaskWatcherController, ChecklistController],
-  providers: [TasksService, PlanLimitsService, TimeTrackingService, TaskTemplateService, CustomFieldService, TaskCommentService, TaskWatcherService, RecurringTaskService, ChecklistService],
+  providers: [TasksService, PlanLimitsService, TimeTrackingService, TaskTemplateService, CustomFieldService, TaskCommentService, TaskWatcherService, RecurringTaskService, ChecklistService, AuthOrApiTokenGuard, TaskGateway],
   exports: [TasksService, TimeTrackingService, TaskTemplateService, CustomFieldService, TaskCommentService, TaskWatcherService, RecurringTaskService, ChecklistService],
 })
 export class TasksModule {}

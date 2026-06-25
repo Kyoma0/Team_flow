@@ -5,11 +5,11 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery, ApiBody, ApiR
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import { AuthGuard } from '../common/guards/auth.guard';
+import { AuthOrApiTokenGuard } from '../common/guards/auth-or-api-token.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('tasks')
-@UseGuards(AuthGuard)
+@UseGuards(AuthOrApiTokenGuard)
 @ApiTags('Tarefas')
 @ApiBearerAuth()
 export class TasksController {

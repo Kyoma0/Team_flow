@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
 import { useParams } from 'next/navigation';
+import { getTaskSocket } from '@/lib/socket';
 import {
   DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors,
 } from '@dnd-kit/core';
@@ -424,6 +425,20 @@ export default function ProjectBoardPage() {
   }, [id, buildQueryString]);
 
   useEffect(() => { fetchTasks(); fetchRunningTimer(); }, [fetchTasks]);
+
+  useEffect(() => {
+    const socket = getTaskSocket();
+    socket.emit('join:project', id);
+    socket.on('task:created', () => fetchTasks());
+    socket.on('task:updated', () => fetchTasks());
+    socket.on('task:deleted', () => fetchTasks());
+    return () => {
+      socket.emit('leave:project', id);
+      socket.off('task:created');
+      socket.off('task:updated');
+      socket.off('task:deleted');
+    };
+  }, [id, fetchTasks]);
 
   const getColumnTasks = (column: BoardColumn) => {
     const activeBoardColumnIds = new Set((activeBoard?.columns || []).map((item) => item.id));

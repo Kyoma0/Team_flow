@@ -6,11 +6,11 @@ import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { AddMemberDto } from './dto/add-member.dto';
-import { AuthGuard } from '../common/guards/auth.guard';
+import { AuthOrApiTokenGuard } from '../common/guards/auth-or-api-token.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('projects')
-@UseGuards(AuthGuard)
+@UseGuards(AuthOrApiTokenGuard)
 @ApiTags('Projetos')
 @ApiBearerAuth()
 export class ProjectsController {
