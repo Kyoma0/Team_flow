@@ -4,7 +4,7 @@ let socket: Socket | null = null;
 
 export const getSocket = (token?: string): Socket => {
   if (!socket) {
-    socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000', {
+    socket = io(process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
       auth: { token: token || (typeof window !== 'undefined' ? localStorage.getItem('token') : '') },
       transports: ['websocket', 'polling'],
     });

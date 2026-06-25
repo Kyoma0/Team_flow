@@ -2,13 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { FilesService } from './files.service';
 import { PrismaService } from '../common/prisma.service';
-import { MinioService } from '../common/minio.service';
+import { StorageService } from '../common/storage.service';
 import { PlanLimitsService } from '../common/plan-limits.service';
 
 describe('FilesService', () => {
   let service: FilesService;
   let prisma: any;
-  let minio: any;
+  let storage: any;
   let planLimits: any;
 
   const mockPrisma = {
@@ -25,12 +25,24 @@ describe('FilesService', () => {
       findMany: jest.fn(),
       findUnique: jest.fn(),
     },
+    project: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'project-1',
+        owner: { name: 'Owner', username: 'owner', email: 'owner@test.com' },
+        company: null,
+      }),
+    },
+    user: {
+      update: jest.fn(),
+    },
   };
 
-  const mockMinio = {
+  const mockStorage = {
     upload: jest.fn(),
     download: jest.fn(),
     remove: jest.fn(),
+    getRelativePath: jest.fn().mockReturnValue('company/user/file.pdf'),
+    getFullPath: jest.fn().mockImplementation((relativePath) => `/root/${relativePath}`),
   };
 
   const mockPlanLimits = {
@@ -42,14 +54,14 @@ describe('FilesService', () => {
       providers: [
         FilesService,
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: MinioService, useValue: mockMinio },
+        { provide: StorageService, useValue: mockStorage },
         { provide: PlanLimitsService, useValue: mockPlanLimits },
       ],
     }).compile();
 
     service = module.get<FilesService>(FilesService);
     prisma = module.get(PrismaService);
-    minio = module.get(MinioService);
+    storage = module.get(StorageService);
     planLimits = module.get(PlanLimitsService);
   });
 
@@ -65,7 +77,7 @@ describe('FilesService', () => {
       size: 1024,
     } as Express.Multer.File;
 
-    it('should create file record after checking storage and uploading to minio', async () => {
+    it('should create file record after checking storage and uploading', async () => {
       const expectedFile = {
         id: 'file-1',
         name: expect.stringMatching(/^[0-9a-f-]+\.pdf$/),
@@ -85,9 +97,11 @@ describe('FilesService', () => {
       const result = await service.upload(mockFile, 'project-1', 'user-1');
 
       expect(mockPlanLimits.checkStorageLimit).toHaveBeenCalledWith('user-1', 1024);
-      expect(mockMinio.upload).toHaveBeenCalledWith(
-        expect.stringMatching(/^[0-9a-f-]+\.pdf$/),
+      expect(mockStorage.upload).toHaveBeenCalledWith(
         mockFile.buffer,
+        expect.any(String),
+        expect.any(String),
+        expect.stringMatching(/^[0-9a-f-]+\.pdf$/),
         mockFile.mimetype,
       );
       expect(mockPrisma.file.create).toHaveBeenCalledWith({
@@ -108,7 +122,7 @@ describe('FilesService', () => {
           name: expect.stringMatching(/^[0-9a-f-]+\.pdf$/),
           originalName: 'document.pdf',
           size: 1024,
-          key: expect.stringMatching(/^[0-9a-f-]+\.pdf$/),
+          key: 'company/user/file.pdf',
           fileId: 'file-1',
           uploadedById: 'user-1',
         },
@@ -204,15 +218,16 @@ describe('FilesService', () => {
   });
 
   describe('downloadVersion', () => {
-    it('should return version file stream from minio', async () => {
+    it('should return version file stream from storage', async () => {
       const version = { id: 'v1', key: 'old-key.pdf', name: 'old-key.pdf', originalName: 'old.pdf' };
       const stream = { pipe: jest.fn() };
       mockPrisma.fileVersion.findUnique.mockResolvedValue(version);
-      mockMinio.download.mockResolvedValue({ exists: true, stream });
+      mockStorage.download.mockResolvedValue({ exists: true, stream });
 
       const result = await service.downloadVersion('v1');
 
-      expect(mockMinio.download).toHaveBeenCalledWith('old-key.pdf');
+      expect(mockStorage.download).toHaveBeenCalledWith('/root/old-key.pdf');
+      expect(mockStorage.getFullPath).toHaveBeenCalledWith('old-key.pdf');
       expect(result).toEqual({ version, stream });
     });
 
@@ -222,21 +237,22 @@ describe('FilesService', () => {
     });
 
     it('should throw NotFoundException when file not in storage', async () => {
-      mockPrisma.fileVersion.findUnique.mockResolvedValue({ id: 'v1', key: 'key' } as any);
-      mockMinio.download.mockResolvedValue({ exists: false, stream: null });
+      mockPrisma.fileVersion.findUnique.mockResolvedValue({ id: 'v1', key: 'key.pdf', name: 'key.pdf' } as any);
+      mockStorage.download.mockResolvedValue({ exists: false, stream: null });
       await expect(service.downloadVersion('v1')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('remove', () => {
-    it('should delete file from minio and database', async () => {
-      const file = { id: 'file-1', name: 'abc.pdf' };
+    it('should delete file from storage and database', async () => {
+      const file = { id: 'file-1', name: 'abc.pdf', key: 'company/user/abc.pdf', size: 1024 };
 
       mockPrisma.file.findUnique.mockResolvedValue(file);
 
       const result = await service.remove('file-1', 'user-1');
 
-      expect(mockMinio.remove).toHaveBeenCalledWith('abc.pdf');
+      expect(mockStorage.remove).toHaveBeenCalledWith('/root/company/user/abc.pdf');
+      expect(mockStorage.getFullPath).toHaveBeenCalledWith('company/user/abc.pdf');
       expect(mockPrisma.file.delete).toHaveBeenCalledWith({ where: { id: 'file-1' } });
       expect(result).toEqual({ message: 'Arquivo excluído' });
     });

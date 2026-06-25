@@ -1,11 +1,15 @@
 import { Controller, Post, Get, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { InviteService } from '../common/invite.service';
+import { PrismaService } from '../common/prisma.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller()
 export class InviteController {
-  constructor(private inviteService: InviteService) {}
+  constructor(
+    private inviteService: InviteService,
+    private prisma: PrismaService,
+  ) {}
 
   @Post('invites')
   @UseGuards(AuthGuard)
@@ -21,8 +25,9 @@ export class InviteController {
 
   @Get('invites/pending')
   @UseGuards(AuthGuard)
-  pending(@CurrentUser('sub') userId: string) {
-    return this.inviteService.findByEmail(userId);
+  async pending(@CurrentUser('sub') userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    return this.inviteService.findByEmail(user?.email || '');
   }
 
   @Get('projects/:projectId/invites')

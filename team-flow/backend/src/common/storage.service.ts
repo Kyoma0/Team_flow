@@ -33,9 +33,9 @@ export class StorageService implements OnModuleInit {
     return filePath;
   }
 
-  async download(filePath: string): Promise<{ stream: Readable; exists: boolean }> {
+  async download(filePath: string): Promise<{ stream: Readable | null; exists: boolean }> {
     const exists = fs.existsSync(filePath);
-    if (!exists) return { stream: null, nullthrows: false } as any;
+    if (!exists)     return { stream: null, exists: false };
     return { stream: fs.createReadStream(filePath), exists: true };
   }
 
