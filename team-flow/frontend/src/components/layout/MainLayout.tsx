@@ -17,26 +17,52 @@ import NotificationBell from '@/components/NotificationBell';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/my-tasks', label: 'Minhas Tarefas', icon: ListTodo },
-  { href: '/my-tasks?favorites=true', label: 'Favoritos', icon: Star },
-  { href: '/projects', label: 'Projetos', icon: FolderKanban, tour: 'sidebar-projects' },
-  { href: '/messages', label: 'Mensagens', icon: MessageSquare, tour: 'sidebar-messages' },
-  { href: '/calendar', label: 'Calendário', icon: CalendarDays },
-  { href: '/clients', label: 'Clientes', icon: Building2 },
-  { href: '/templates', label: 'Modelos', icon: Layers },
-  { href: '/reports', label: 'Relatórios', icon: BarChart3 },
-  { href: '/webhooks', label: 'Webhooks', icon: LinkIcon },
-  { href: '/tokens', label: 'API Tokens', icon: Key },
-  { href: '/import-export', label: 'Importar/Exportar', icon: Upload },
-  { href: '/notificacoes', label: 'Notificações', icon: Bell },
-  { href: '/plans', label: 'Planos', icon: Crown },
-  { href: '/security', label: 'Segurança', icon: Shield },
-  { href: '/profile', label: 'Perfil', icon: User },
-  { href: '/admin', label: 'Admin', icon: Users, adminOnly: true },
-  { href: '/invites', label: 'Convites', icon: MailPlus },
-  { href: '/account', label: 'Conta', icon: Settings },
+const navGroups = [
+  {
+    title: null,
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/my-tasks', label: 'Minhas Tarefas', icon: ListTodo },
+      { href: '/my-tasks?favorites=true', label: 'Favoritos', icon: Star },
+      { href: '/projects', label: 'Projetos', icon: FolderKanban, tour: 'sidebar-projects' },
+      { href: '/messages', label: 'Mensagens', icon: MessageSquare, tour: 'sidebar-messages' },
+      { href: '/calendar', label: 'Calendário', icon: CalendarDays },
+    ],
+  },
+  {
+    title: 'Workspace',
+    items: [
+      { href: '/clients', label: 'Clientes', icon: Building2 },
+      { href: '/templates', label: 'Modelos', icon: Layers },
+      { href: '/reports', label: 'Relatórios', icon: BarChart3 },
+    ],
+  },
+  {
+    title: 'Integrações',
+    items: [
+      { href: '/webhooks', label: 'Webhooks', icon: LinkIcon },
+      { href: '/tokens', label: 'API Tokens', icon: Key },
+      { href: '/import-export', label: 'Importar/Exportar', icon: Upload },
+    ],
+  },
+  {
+    title: 'Conta',
+    items: [
+      { href: '/notification-settings', label: 'Notificações', icon: Bell },
+      { href: '/plans', label: 'Planos', icon: Crown },
+      { href: '/security', label: 'Segurança', icon: Shield },
+      { href: '/profile', label: 'Perfil', icon: User },
+      { href: '/invites', label: 'Convites', icon: MailPlus },
+      { href: '/account', label: 'Conta', icon: Settings },
+    ],
+  },
+  {
+    title: 'Administração',
+    adminOnly: true,
+    items: [
+      { href: '/admin', label: 'Admin', icon: Users, adminOnly: true },
+    ],
+  },
 ];
 
 export function MainLayout({ children }: { children: ReactNode }) {
@@ -92,27 +118,41 @@ export function MainLayout({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        <nav className="p-4 space-y-1">
-          {navItems.map((item) => {
-            if (item.adminOnly && user.roleType !== 'ADMIN') return null;
-            const active = pathname.startsWith(item.href);
+        <nav className="p-4">
+          {navGroups.map((group, gi) => {
+            const visibleItems = group.items.filter((item) =>
+              !(item as any).adminOnly || user.roleType === 'ADMIN'
+            );
+            if (visibleItems.length === 0) return null;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                data-tour={item.tour}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                  ${active
-                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
-                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700'
-                  }`}
-              >
-                <item.icon className="w-5 h-5" />
-                {item.label}
-              </Link>
+              <div key={gi} className={gi > 0 ? 'pt-4 mt-4 border-t border-gray-200 dark:border-slate-700' : ''}>
+                {group.title && (
+                  <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    {group.title}
+                  </p>
+                )}
+                {visibleItems.map((item) => {
+                  const active = pathname.startsWith(item.href.split('?')[0]);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      data-tour={(item as any).tour}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                        ${active
+                          ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700'
+                        }`}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
             );
           })}
-          <div className="pt-4 border-t border-gray-200 dark:border-slate-700">
+          <div className="pt-4 mt-4 border-t border-gray-200 dark:border-slate-700">
             <ThemeToggle />
           </div>
         </nav>

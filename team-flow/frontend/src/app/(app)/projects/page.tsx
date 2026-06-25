@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import Link from 'next/link';
-import { Plus, FolderKanban, MoreHorizontal, Search, Filter, Building2, Star } from 'lucide-react';
+import { Plus, FolderKanban, MoreHorizontal, Search, Filter, Building2, Star, ListChecks, Users, Layers } from 'lucide-react';
 import { useFavorites } from '@/hooks/useFavorites';
 import toast from 'react-hot-toast';
 
@@ -23,11 +23,18 @@ export default function ProjectsPage() {
   const limit = 12;
 
   const fetchProjects = async (p = page) => {
-    const { data } = await api.get(`/api/projects?page=${p}&limit=${limit}`);
-    setProjects(data.projects);
-    setStats(data.stats);
-    setPagination(data.pagination);
-    setLoading(false);
+    try {
+      const { data } = await api.get(`/api/projects?page=${p}&limit=${limit}`);
+      setProjects(data.projects);
+      setStats(data.stats);
+      setPagination(data.pagination);
+    } catch (err) {
+      console.error('Erro ao buscar projetos:', err);
+      setProjects([]);
+      setStats(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchProjects(); }, []);
@@ -142,17 +149,17 @@ export default function ProjectsPage() {
                   </span>
                 </div>
               </div>
-            <h3 className="font-semibold mb-1 group-hover:text-primary-600 transition-colors">{project.name}</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-3">{project.description || 'Sem descrição'}</p>
+            <h3 className="font-semibold text-base mb-1 group-hover:text-primary-600 transition-colors">{project.name}</h3>
             {project.client && (
-              <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                <Building2 className="w-3.5 h-3.5" /> {project.client.name}
+              <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 mb-2">
+                <Building2 className="w-3 h-3" /> {project.client.name}
               </div>
             )}
-            <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 pt-3 border-t border-gray-100 dark:border-slate-700">
-              <span>{project._count.tasks} tarefas</span>
-              <span>{project._count.members} membros</span>
-              <span>{project._count.groups} grupos</span>
+            <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-3">{project.description || 'Sem descrição'}</p>
+            <div className="flex items-center gap-4 text-xs font-medium text-gray-600 dark:text-gray-300 pt-3 border-t border-gray-100 dark:border-slate-700">
+              <span className="flex items-center gap-1"><ListChecks className="w-3.5 h-3.5 text-gray-400" /> {project._count.tasks}</span>
+              <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5 text-gray-400" /> {project._count.members}</span>
+              <span className="flex items-center gap-1"><Layers className="w-3.5 h-3.5 text-gray-400" /> {project._count.groups}</span>
             </div>
           </Link>
         ))}

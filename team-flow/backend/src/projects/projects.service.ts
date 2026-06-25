@@ -52,6 +52,7 @@ export class ProjectsService {
           owner: { select: { id: true, username: true, name: true, email: true, avatar: true } },
           members: { include: { user: { select: { id: true, username: true, name: true, email: true, avatar: true } } } },
           client: { select: { id: true, name: true, company: true } },
+          _count: { select: { tasks: true, members: true, groups: true } },
         },
         orderBy: { updatedAt: 'desc' },
         ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),

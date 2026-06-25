@@ -10,16 +10,17 @@ export class CreateProjectDto {
   @IsString()
   description?: string;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsOptional()
   @IsDateString()
-  @Transform(({ value }) => value || undefined)
   startDate?: string;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsOptional()
   @IsDateString()
-  @Transform(({ value }) => value || undefined)
   endDate?: string;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsOptional()
   @IsString()
   clientId?: string;

@@ -21,9 +21,9 @@ export class UpdateTaskDto {
   @IsIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
   priority?: string;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsOptional()
   @IsDateString()
-  @Transform(({ value }) => value || undefined)
   dueDate?: string;
 
   @IsOptional()
@@ -42,8 +42,8 @@ export class UpdateTaskDto {
   @IsString()
   recurring?: string;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsOptional()
   @IsDateString()
-  @Transform(({ value }) => value || undefined)
   repeatUntil?: string;
 }
